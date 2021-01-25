@@ -10,8 +10,14 @@
 		"database" : ""
 	},
 	"cloudwatch" : {
+		"use_cloudwatch" : true,
   		"log_group" : "",
   		"stream_name": "",
   		"send_interval" : 1
+	},
+	"s3" : {
+		"bucket": "dev-salk-hpi",
+  		"bucket_dir": "image/giraffe/raw/",
+  		"####COMMENT" : "must include '/' at the end for bucket_dir"
 	}
 }

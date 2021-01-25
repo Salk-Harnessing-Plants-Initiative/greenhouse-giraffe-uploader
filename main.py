@@ -1,27 +1,96 @@
-import time
-from datetime import datetime
 import logging
 import json
-import threading
+from datetime import datetime
 # Path-related
 import os
 import shutil
 import ntpath
-# For decoding QR
+# Getting file creation timestamp
+import platform
+# Threading
+import time
+import threading
+# QR decoding
 from PIL import Image
 from pyzbar.pyzbar import decode
-# For getting file creation timestamp
-import platform
-# For detecting new files
+# Postgres
+import psycopg2
+from psycopg2 import Error
+# AWS S3
+import boto3
+import uuid
+# Detecting new files
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
-# For AWS S3
-import boto3
-from botocore.exceptions import ClientError
-import uuid
-# For logging remotely to AWS CloudWatch
-from boto3.session import Session
+# Remote logging to AWS CloudWatch
 import watchtower
+# How many seconds to wait to process after a new file is moved into `unprocessed_dir`
+SECONDS_DELAY = 10.0
+
+def load_last_reference_from_file():
+    # Get last valid QR Code we remember
+    try:
+        with open('persist.json') as f:
+            last_reference = json.load(f)
+        assert "qr_code" in last_reference
+    except:
+        last_reference = {"qr_code" : ""}
+    return last_reference
+
+def store_last_reference_to_file(last_reference):
+    with open('persist.json', 'w') as f:
+        json.dump(last_reference, f, indent = 4)
+
+def get_files_alphabetical_order(directory):
+    files = sorted([file for file in os.listdir(directory) if not file[0] == '.'])
+    return files
+
+def get_qr_codes(image_path):
+    qr_codes = [qr_object.data.decode() for qr_object in decode(Image.open(image_path))]
+    return qr_codes
+
+def qr_is_valid_section(config, qr_code):
+    postgres = config['postgres']
+    connection = psycopg2.connect(user=postgres['user'],
+        password=postgres['password'],
+        host=postgres['host'],
+        port=postgres['port'],
+        database=postgres['database']
+    )
+    cursor = connection.cursor()
+    query = "SELECT EXISTS(SELECT 1 FROM section WHERE section_name = %s OR section_id = %s)"
+    data = (qr_code, qr_code)
+    cursor.execute(query, data)
+    qr_valid = cursor.fetchall()[0][0]
+    cursor.close()
+    connection.close()
+    return qr_valid
+
+def update_reference(config, last_reference, qr_code):
+    """Updates what "qr_code" will be in S3 metadata for the images uploaded
+    henceforth if the qr_code represents a legitimate section_id or section_name
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("QR detected = {}".format(qr_code))
+    try:
+        if qr_is_valid_section(config, qr_code):
+                last_reference["qr_code"] = qr_code
+                store_last_reference_to_file(last_reference)
+                logger.info("QR {} was a valid section and saved as last reference".format(qr_code)) 
+            else:
+                logger.info("QR {} was not valid section so not used as last reference".format(qr_code))
+    except (Exception, Error) as e:
+        logger.error(e)
+    finally:
+        return last_reference
+    
+def generate_bucket_key(file_path, s3_directory):
+    """Keep things nice and random to prevent collisions
+    "/Users/russell/Documents/taco_tuesday.jpg" becomes "raw/taco_tuesday-b94b0793-6c74-44a9-94e0-00420711130d.jpg"
+    Note: We still like to keep the basename because some files' only timestamp is in the filename
+    """
+    root_ext = os.path.splitext(ntpath.basename(file_path));
+    return s3_directory + root_ext[0] + "-" + str(uuid.uuid4()) + root_ext[1];
 
 def creation_date(file_path):
     """
@@ -55,44 +124,6 @@ def get_metadata(file_path):
         pass
     return metadata
 
-def upload_file(s3_client, file_name, bucket, object_name, print_progress=False):
-    """Upload a file to an S3 bucket and include special metadata
-    :param s3_client: Initialized S3 client to use
-    :param file_name: File to upload
-    :param bucket: Bucket to upload to
-    :param object_name: S3 object name. Also known as a "Key" in S3 bucket terms.
-    :param print_progress: Optional, prints upload progress if True
-    """
-    s3_client.upload_file(file_name, bucket, object_name, 
-        Callback=ProgressPercentage(file_name) if print_progress else None,
-        ExtraArgs=get_metadata(file_name))
-
-
-def generate_bucket_key(file_path, s3_directory):
-    """Keep things nice and random to prevent collisions
-    "/Users/russell/Documents/taco_tuesday.jpg" becomes "raw/taco_tuesday-b94b0793-6c74-44a9-94e0-00420711130d.jpg"
-    Note: We still like to keep the basename because some files' only timestamp is in the filename
-    """
-    root_ext = os.path.splitext(ntpath.basename(file_path));
-    return s3_directory + root_ext[0] + "-" + str(uuid.uuid4()) + root_ext[1];
-
-def move(src_path, dst_path):
-    """ Move file from src_path to dst_path, creating new directories from dst_path 
-    along the way if they don't already exist.     
-    Avoids collisions if file already exists at dst_path by adding "(#)" if necessary
-    (Formatted the same way filename collisions are resolved in Google Chrome downloads)
-    """
-    root_ext = os.path.splitext(dst_path)
-    i = 0
-    while os.path.isfile(dst_path):
-        # Recursively avoid the collision
-        i += 1
-        dst_path = root_ext[0] + " ({})".format(i) + root_ext[1]
-
-    # Finally move file, make directories if needed
-    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-    shutil.move(src_path, dst_path)
-
 def make_parallel_path(src_dir, dst_dir, src_path, add_date_subdir=True):
     """Creates a parallel path of src_path using dst_dir instead of src_dir
     as the prefix. If add_date_subdir is True, uses dst_dir/(today's date in "YYYY-MM-DD" format)/
@@ -114,191 +145,53 @@ def make_parallel_path(src_dir, dst_dir, src_path, add_date_subdir=True):
     result = os.path.join(result, suffix)
     return result
 
-class ProgressPercentage(object):
-    """Callback used for boto3 to sporadically report the upload progress for a large file
+def move(src_path, dst_path):
+    """ Move file from src_path to dst_path, creating new directories from dst_path 
+    along the way if they don't already exist.     
+    Avoids collisions if file already exists at dst_path by adding "(#)" if necessary
+    (Formatted the same way filename collisions are resolved in Google Chrome downloads)
     """
+    root_ext = os.path.splitext(dst_path)
+    i = 0
+    while os.path.isfile(dst_path):
+        # Recursively avoid the collision
+        i += 1
+        dst_path = root_ext[0] + " ({})".format(i) + root_ext[1]
+    # Finally move file, make directories if needed
+    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+    shutil.move(src_path, dst_path)
 
-    def __init__(self, filename):
-        self._filename = filename
-        self._size = float(os.path.getsize(filename))
-        self._seen_so_far = 0
-
-    def __call__(self, bytes_amount):
-        """Callback that logs how many bytes have been uploaded so far for a particular file
-        """
-        self._seen_so_far += bytes_amount
-        percentage = (self._seen_so_far / self._size) * 100
-        # Print instead of log because this gets kind of spammy
-        print("Uploading status for {}: {} / {} ({}%)".format(self._filename, self._seen_so_far, self._size, percentage))
-
-class S3EventHandler(FileSystemEventHandler):
-    """Handler for what to do if watchdog detects a filesystem change
-    """
-
-    def __init__(self, s3_client, s3_bucket, s3_bucket_dir, unprocessed_dir, done_dir, error_dir):
-        self.s3_client = s3_client
-        self.s3_bucket = s3_bucket
-        self.s3_bucket_dir = s3_bucket_dir
-        self.unprocessed_dir = unprocessed_dir
-        self.done_dir = done_dir
-        self.error_dir = error_dir
-
-    def on_created(self, event):
-        is_file = not event.is_directory
-        if is_file:
-            process(event.src_path, self.s3_client, self.s3_bucket, self.s3_bucket_dir, 
-                self.done_dir, self.error_dir, self.unprocessed_dir)
-        else:
-            # Crawl the new directory and process everything in it
-            file_paths = get_preexisting_files(event.src_path)
-            for file_path in file_paths:
-                process(file_path, s3_client, bucket, bucket_dir, done_dir, error_dir, unprocessed_dir)
-
-# Global
-SECONDS_DELAY = 10.0
-last_reference = {}
-try:
-    with open('persist.json') as f:
-        last_reference = json.load(f)
-except:
-    pass
-lock = threading.Lock()
-t = None
-auth = boxsdk.JWTAuth.from_settings_file('box_config.json')
-client = boxsdk.Client(auth)
-with open('config.json') as f:
-    config = json.load(f)
-unprocessed_dir = config['unprocessed_dir']
-error_dir = config['error_dir']
-done_dir = config['done_dir']
-postgres = config['postgres']
-cloudwatch = config['cloudwatch']
-
-# Fail on startup if something's wrong
-print("Checking the connections...")
-# None of the dirs should be the same as another
-assert (len([unprocessed_dir, error_dir, done_dir]) == len(set([unprocessed_dir, error_dir, done_dir])))
-# Check Box connection
-client.user().get()
-# Check postgres connection
-psycopg2.connect(user=postgres['user'],
-    password=postgres['password'],
-    host=postgres['host'],
-    port=postgres['port'],
-    database=postgres['database']
-).cursor().execute("SELECT version();")
-# Setup remote logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING,
-                        format='%(asctime)s - %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-"""
-watchtower_handler = watchtower.CloudWatchLogHandler(
-    log_group=cloudwatch["log_group"],
-    stream_name=cloudwatch["stream_name"],
-    send_interval=cloudwatch["send_interval"],
-    create_log_group=False
-)
-logger.addHandler(watchtower_handler)
-"""
-
-def process():
+def process(config):
     logger = logging.getLogger(__name__)
-    files = sorted([file for file in os.listdir(unprocessed_dir) if not file[0] == '.'])
+    unprocessed_dir, error_dir, done_dir = config['unprocessed_dir'], config['error_dir'], config['done_dir']
+    last_reference = load_last_reference_from_file()
+    s3_client = boto3.client('s3')
+
+    files = get_files_alphabetical_order(unprocessed_dir)
     if len(files) > 0:
-        logger.warning("Processing files in the order: {}".format(files))
+        logger.info("Processing files in the order: {}".format(files))
     for file in files:
         path = os.path.join(unprocessed_dir, file)
         # QR code if present
         try:
-            qr_codes = [qr_object.data.decode() for qr_object in decode(Image.open(path))]
+            qr_codes = get_qr_codes(path)
             for qr_code in qr_codes:
-                update_reference(qr_code)
+                last_reference = update_reference(config, last_reference, qr_code)
         except Exception as e:
-            logger.error(e)
+            logger.error(repr(e))
         # Process
         try:
-            for match in last_reference['matches']:
-                upload_to_box(path, match['box_folder_id'], match['section_name'])
-            # upload_to_s3(path)
-            done_path = desktop_uploader.make_parallel_path(unprocessed_dir, done_dir, path)
-            desktop_uploader.move(path, done_path)
+            bucket = config['s3']['bucket']
+            key = generate_bucket_key(path, config['s3']['bucket_dir'])
+            metadata = get_metadata(path)
+            s3_client.upload_file(path, bucket, key, ExtraArgs=metadata)
         except Exception as e:
             logger.error(e)
-            error_path = desktop_uploader.make_parallel_path(unprocessed_dir, error_dir, path)
-            desktop_uploader.move(path, error_path)
-
-def update_reference(qr_code):
-    print("qr = {}".format(qr_code))
-    global last_reference
-    try:
-        # Connect to database
-        connection = psycopg2.connect(user=postgres['user'],
-            password=postgres['password'],
-            host=postgres['host'],
-            port=postgres['port'],
-            database=postgres['database']
-        )
-        # Create a cursor to perform database operations
-        cursor = connection.cursor()
-        # Executing a SQL query
-        query = (
-            "SELECT box_folder_id, experiment_id, section_name FROM greenhouse_box\n"
-            "INNER JOIN section USING (section_name)\n"
-            "WHERE section_id = '{value}' OR section_name = '{value}';".format(value=qr_code)
-        )
-        cursor.execute(query)
-        results = cursor.fetchall()
-        print(results)
-        try:
-            if results is not None:
-                print("uh hello")
-                last_reference = {'matches' : []}
-                for result in results:
-                    print("hi")
-                    match = {}
-                    match['box_folder_id'] = result[0]
-                    match['experiment_id'] = result[1]
-                    match['section_name'] = result[2]
-                    last_reference['matches'].append(match)
-
-                print("Updated to {}".format(last_reference)) # Temporary 
-                with open('persist.json', 'w') as f:
-                    json.dump(last_reference, f, indent = 4)
-        except Exception as e:
-            print(e)
-
-    except (Exception, Error) as error:
-        raise Exception("Error while connecting to PostgreSQL: ", error)
-    finally:
-        if (connection):
-            cursor.close()
-            connection.close()
-
-def get_subfolder(box_folder, subfolder_name):
-    subfolders = [item for item in box_folder.get_items() if type(item) == boxsdk.object.folder.Folder]
-    subfolder_names = [subfolder.name for subfolder in subfolders]
-    if subfolder_name not in subfolder_names:
-        subfolder = box_folder.create_subfolder(subfolder_name)
-        return subfolder
-    else:
-        for subfolder in subfolders:
-            if subfolder.name == subfolder_name:
-                return subfolder
-
-def upload_to_box(file, box_folder_id, section_name, use_date_subfolder=True, use_section_subfolder=True):
-    root_folder = client.folder(folder_id=box_folder_id).get()
-    current_folder = root_folder
-
-    if use_date_subfolder:
-        file_creation_timestamp = desktop_uploader.creation_date(file)
-        file_creation_date = datetime.fromtimestamp(file_creation_timestamp).strftime('%Y-%m-%d')
-        current_folder = get_subfolder(current_folder, file_creation_date)
-
-    if use_section_subfolder:
-        current_folder = get_subfolder(current_folder, section_name)
-
-    current_folder.upload(file)
+            error_path = make_parallel_path(unprocessed_dir, error_dir, path)
+            move(path, error_path)
+        else:
+            done_path = make_parallel_path(unprocessed_dir, done_dir, path)
+            move(path, done_path)
 
 class GiraffeEventHandler(FileSystemEventHandler):
     """Handler for what to do if watchdog detects a filesystem change
@@ -310,30 +203,74 @@ class GiraffeEventHandler(FileSystemEventHandler):
             with lock:
                 t.cancel()
 
-def main():
-    global t
+def assert_directories_configured(config):
+    # None of the dirs should be the same as another
+    unprocessed_dir = config['unprocessed_dir']
+    error_dir = config['error_dir']
+    done_dir = config['done_dir']
+    assert (len([unprocessed_dir, error_dir, done_dir]) == len(set([unprocessed_dir, error_dir, done_dir])))
 
-    logger.warning("Running Greenhouse Giraffe Uploader...")
-    # process() will run after the countdown if not interrupted during countdown
+def assert_postgres_working(config):
+    # Check postgres connection
+    postgres = config['postgres']
+    psycopg2.connect(user=postgres['user'],
+        password=postgres['password'],
+        host=postgres['host'],
+        port=postgres['port'],
+        database=postgres['database']
+    ).cursor().execute("SELECT version();")
+
+def assert_s3_working(config):
+    s3 = boto3.resource('s3')
+    assert s3.Bucket(config['s3']['bucket']) in s3.buckets.all()
+
+def setup_remote_logging(config):
+    logger = logging.getLogger(__name__)
+    cloudwatch = config['cloudwatch']
+    if cloudwatch['use_cloudwatch']:
+        watchtower_handler = watchtower.CloudWatchLogHandler(
+            log_group=cloudwatch["log_group"],
+            stream_name=cloudwatch["stream_name"],
+            send_interval=cloudwatch["send_interval"],
+            create_log_group=True
+        )
+    logger.addHandler(watchtower_handler)
+
+def main():
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    with open('config.json') as f:
+        config = json.load(f)
+    print("Checking the connections...")
+    assert_directories_configured(config)
+    assert_postgres_working(config)
+    assert_s3_working(config)
+    setup_remote_logging(config)
+
+    logger.info("Running Greenhouse Giraffe Uploader...")
+    lock = threading.Lock()
+    t = None
+    args = (config,)
     with lock:
-        t = threading.Timer(SECONDS_DELAY, process)
+        t = threading.Timer(SECONDS_DELAY, process, args=args)
     # Setup the watchdog handler for new files that are added while the script is running
     observer = Observer()
     observer.schedule(GiraffeEventHandler(), unprocessed_dir, recursive=True)
     observer.start()
     # run process() with countdown indefinitely
+    # process() will run after the countdown if not interrupted during countdown
     try:
         while True:
             with lock:
-                t = threading.Timer(SECONDS_DELAY, process)
+                t = threading.Timer(SECONDS_DELAY, process, args=args)
                 t.start()
             t.join()
     except KeyboardInterrupt:
-        logger.warning("KeyboardInterrupt: shutting down...")
+        logger.info("KeyboardInterrupt: shutting down...")
         observer.stop()
         observer.join()
         t.join()
-        # todo: t.stop equivl
+        # TODO: t.stop equivalent
 
 if __name__ == "__main__":
     main()

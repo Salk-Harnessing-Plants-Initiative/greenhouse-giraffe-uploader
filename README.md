@@ -1,5 +1,6 @@
 # greenhouse-giraffe-uploader
-For use on Windows
+* For use on Windows
+* Put the images in the `unprocesssed_dir`. They cannot be in subfolders.
 
 # Installation from a fresh Windows computer (overly detailed)
 0. Install git https://git-scm.com/download/win
