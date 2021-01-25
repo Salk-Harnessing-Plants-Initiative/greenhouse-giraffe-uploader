@@ -8,7 +8,7 @@
 0. Install git https://git-scm.com/download/win
 1. Install Python 3.9 from the Microsoft Store (just type Python in the Windows search bar). Pip will come with it.
 2. `pip install -r requirements.txt`
-3. `cp example_config.json config.json` using Powershell, and fill it out.
+3. `cp example_config.json config.json` using Powershell, and fill it out. (You should have a Postgres user with at least read access)
 4. Install AWS CLI https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-windows.html
 5. `aws configure` (You should have an AWS IAM user with the following policies):
 ```
@@ -21,6 +21,7 @@ logs:PutLogEvents
 Access to the S3 bucket
 Access to the cloudwatch log group
 ```
+6. `python main.py`
 
 If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
 you will most likely need the `Visual C++ Redistributable Packages for Visual
