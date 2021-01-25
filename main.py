@@ -26,6 +26,8 @@ from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 import watchtower
 # How many seconds to wait to process after a new file is moved into `unprocessed_dir`
 SECONDS_DELAY = 10.0
+lock = threading.Lock()
+t = None
 
 def load_last_reference_from_file():
     # Get last valid QR Code we remember
@@ -77,8 +79,8 @@ def update_reference(config, last_reference, qr_code):
                 last_reference["qr_code"] = qr_code
                 store_last_reference_to_file(last_reference)
                 logger.info("QR {} was a valid section and saved as last reference".format(qr_code)) 
-            else:
-                logger.info("QR {} was not valid section so not used as last reference".format(qr_code))
+        else:
+            logger.info("QR {} was not valid section so not used as last reference".format(qr_code))
     except (Exception, Error) as e:
         logger.error(e)
     finally:
@@ -188,7 +190,7 @@ def process(config):
             bucket = config['s3']['bucket']
             key = generate_bucket_key(path, config['s3']['bucket_dir'])
             qr_code = last_reference["qr_code"]
-            metadata = get_metadata(path, config, qr_code, qr_codes)
+            metadata = get_metadata(path, config, last_reference, qr_code, qr_codes)
             s3_client.upload_file(path, bucket, key, ExtraArgs=metadata)
         except Exception as e:
             logger.error(e)
@@ -202,6 +204,8 @@ class GiraffeEventHandler(FileSystemEventHandler):
     """Handler for what to do if watchdog detects a filesystem change
     """
     def on_created(self, event):
+        global lock
+        global t
         is_file = not event.is_directory
         if is_file:
             # Attempt to cancel the thread if in countdown mode
@@ -242,6 +246,8 @@ def setup_remote_logging(config):
     logger.addHandler(watchtower_handler)
 
 def main():
+    global lock
+    global t
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     with open('config.json') as f:
@@ -253,14 +259,12 @@ def main():
     setup_remote_logging(config)
 
     logger.info("Running Greenhouse Giraffe Uploader...")
-    lock = threading.Lock()
-    t = None
     args = (config,)
     with lock:
         t = threading.Timer(SECONDS_DELAY, process, args=args)
     # Setup the watchdog handler for new files that are added while the script is running
     observer = Observer()
-    observer.schedule(GiraffeEventHandler(), unprocessed_dir, recursive=True)
+    observer.schedule(GiraffeEventHandler(), config['unprocessed_dir'], recursive=True)
     observer.start()
     # run process() with countdown indefinitely
     # process() will run after the countdown if not interrupted during countdown

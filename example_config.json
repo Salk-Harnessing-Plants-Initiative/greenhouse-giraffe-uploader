@@ -12,8 +12,8 @@
 	},
 	"cloudwatch" : {
 		"use_cloudwatch" : true,
-  		"log_group" : "",
-  		"stream_name": "",
+  		"log_group" : "s3-desktop-uploader",
+  		"stream_name": "giraffe_1",
   		"send_interval" : 1
 	},
 	"s3" : {
