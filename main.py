@@ -199,18 +199,27 @@ def process(config):
         else:
             done_path = make_parallel_path(unprocessed_dir, done_dir, path)
             move(path, done_path)
+    if len(files) > 0:
+        logger.info("Done processing the batch")
 
 class GiraffeEventHandler(FileSystemEventHandler):
     """Handler for what to do if watchdog detects a filesystem change
     """
+    def __init__(self, config):
+        self.config = config
+
     def on_created(self, event):
         global lock
         global t
         is_file = not event.is_directory
         if is_file:
             # Attempt to cancel the thread if in countdown mode
+            # And start up a new one with countdown
             with lock:
                 t.cancel()
+                t.join()
+                t = threading.Timer(SECONDS_DELAY, process, args=(self.config,))
+                t.start()
 
 def assert_directories_configured(config):
     # None of the dirs should be the same as another
@@ -259,27 +268,28 @@ def main():
     setup_remote_logging(config)
 
     logger.info("Running Greenhouse Giraffe Uploader...")
-    args = (config,)
+    # Startup a single processing thread in case there are any images preexisting in `unprocessed_dir`
     with lock:
-        t = threading.Timer(SECONDS_DELAY, process, args=args)
+        t = threading.Timer(SECONDS_DELAY, process, args=(config,))
+        t.start()
     # Setup the watchdog handler for new files that are added while the script is running
     observer = Observer()
-    observer.schedule(GiraffeEventHandler(), config['unprocessed_dir'], recursive=True)
+    observer.schedule(GiraffeEventHandler(config), config['unprocessed_dir'], recursive=True)
     observer.start()
     # run process() with countdown indefinitely
     # process() will run after the countdown if not interrupted during countdown
     try:
+        s = 0
         while True:
-            with lock:
-                t = threading.Timer(SECONDS_DELAY, process, args=args)
-                t.start()
-            t.join()
+            time.sleep(1)
+            s += 1
+            if config['log_heartbeat'] and s >= config['heartbeat_seconds']:
+                logger.info("HEARTBEAT")
+                s = 0
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt: shutting down...")
         observer.stop()
         observer.join()
-        t.join()
-        # TODO: t.stop equivalent
 
 if __name__ == "__main__":
     main()

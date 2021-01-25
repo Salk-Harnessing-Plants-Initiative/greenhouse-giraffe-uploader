@@ -3,6 +3,8 @@
 	"error_dir" : "",
 	"done_dir" : "",
 	"upload_device_id" : "giraffe_1",
+	"log_heartbeat" : true,
+	"heartbeat_seconds" : 21600,
 	"postgres" : {
 		"user" : "",
 		"password" : "",
