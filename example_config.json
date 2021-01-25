@@ -2,6 +2,7 @@
 	"unprocessed_dir" : "",
 	"error_dir" : "",
 	"done_dir" : "",
+	"upload_device_id" : "giraffe_1",
 	"postgres" : {
 		"user" : "",
 		"password" : "",

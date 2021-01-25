@@ -115,9 +115,12 @@ def get_file_created(file_path):
     """
     return datetime.fromtimestamp(creation_date(file_path)).astimezone().isoformat()
 
-def get_metadata(file_path):
+def get_metadata(file_path, config, last_reference, qr_code, qr_codes):
     metadata = {"Metadata": {}}
     metadata["Metadata"]["user_input_filename"] = os.path.basename(file_path)
+    metadata["Metadata"]["upload_device_id"] = config['upload_device_id']
+    metadata["Metadata"]["qr_code"] = qr_code
+    metadata["Metadata"]["qr_codes"] = str(qr_codes)
     try:
         metadata["Metadata"]["file_created"] = get_file_created(file_path)
     except:
@@ -173,6 +176,7 @@ def process(config):
     for file in files:
         path = os.path.join(unprocessed_dir, file)
         # QR code if present
+        qr_codes = [] # All QR codes present in the image, NOT the assigned QR code used for matching
         try:
             qr_codes = get_qr_codes(path)
             for qr_code in qr_codes:
@@ -183,7 +187,8 @@ def process(config):
         try:
             bucket = config['s3']['bucket']
             key = generate_bucket_key(path, config['s3']['bucket_dir'])
-            metadata = get_metadata(path)
+            qr_code = last_reference["qr_code"]
+            metadata = get_metadata(path, config, qr_code, qr_codes)
             s3_client.upload_file(path, bucket, key, ExtraArgs=metadata)
         except Exception as e:
             logger.error(e)
