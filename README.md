@@ -16,7 +16,7 @@
 2. `pip install -r requirements.txt`
 3. `cp example_config.json config.json` using Powershell, and fill it out. (You should have a Postgres user with at least read access). (VPC should have IP added to whitelist).
 4. Install AWS CLI https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-windows.html
-5. `aws configure` (You should have an AWS IAM user with the following policies):
+5. `aws configure` with `Default region name` as `us-west-2` and `Output format` `None`. (You should have an AWS IAM user with the following policies):
 ```
 s3:PutObject
 s3:ListAllMyBuckets
