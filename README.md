@@ -28,7 +28,7 @@ Access to the S3 bucket
 Access to the cloudwatch log group
 ```
 6. `python main.py`
-7. https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f
+7. Follow the steps while running PowerShell as administrator: https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f
 
 * Hints: Windows PowerShell will make your life easier if you're coming from Linux/Mac. Also, on Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
 * If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
