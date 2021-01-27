@@ -30,9 +30,10 @@ Access to the cloudwatch log group
 6. `python main.py`
 7. https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f
 
-If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
+* Hints: Windows PowerShell will make your life easier if you're coming from Linux/Mac. Also, on Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
+* If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
 you will most likely need the `Visual C++ Redistributable Packages for Visual
 Studio 2013
 <https://www.microsoft.com/en-US/download/details.aspx?id=40784>`__.
 Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
-using 32-bit Python.
+using 32-bit Python. --Quoted from the pyzbar github repo
