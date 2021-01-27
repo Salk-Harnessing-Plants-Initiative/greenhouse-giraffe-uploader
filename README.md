@@ -28,6 +28,7 @@ Access to the S3 bucket
 Access to the cloudwatch log group
 ```
 6. `python main.py`
+7. https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f
 
 If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
 you will most likely need the `Visual C++ Redistributable Packages for Visual
