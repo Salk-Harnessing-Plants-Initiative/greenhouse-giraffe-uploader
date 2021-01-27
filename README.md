@@ -12,7 +12,7 @@
 # Installation 
 ## From a fresh Windows computer (overly detailed)
 0. Install git https://git-scm.com/download/win
-1. Install Python 3.9 from the Microsoft Store (just type Python in the Windows search bar). Pip will come with it.
+1. Install Python 3.6.2 https://www.python.org/downloads/release/python-362/. Pip will come with it.
 2. `pip install -r requirements.txt`
 3. `cp example_config.json config.json` using Powershell, and fill it out. (You should have a Postgres user with at least read access). (VPC should have IP added to whitelist).
 4. Install AWS CLI https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-windows.html
