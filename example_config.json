@@ -1,7 +1,7 @@
 {
-	"unprocessed_dir" : "",
-	"error_dir" : "",
-	"done_dir" : "",
+	"unprocessed_dir" : "C:\\Users\\Greenhouse\\Desktop\\uploader\\unprocessed",
+	"error_dir" : "C:\\Users\\Greenhouse\\Desktop\\uploader\\error",
+	"done_dir" : "C:\\Users\\Greenhouse\\Desktop\\uploader\\done",
 	"upload_device_id" : "giraffe_1",
 	"log_heartbeat" : true,
 	"heartbeat_seconds" : 21600,
