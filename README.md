@@ -29,6 +29,8 @@ Access to the cloudwatch log group
 ```
 6. `python main.py`
 7. Follow the steps while running PowerShell as administrator: https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f. As of January 2021, doesn't work with Python 3.9 so that's why we have to use 3.6.2
+8. Windows Button > Services > `Giraffe Uploader Service` > `Properties` > `Startup type` > Change from `Manual` to `Automatic`
+9. Update Windows Power settings so takes longer to fall asleep (or not at all). 
 
 * Hints: Windows PowerShell will make your life easier if you're coming from Linux/Mac. Also, on Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
 * If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
