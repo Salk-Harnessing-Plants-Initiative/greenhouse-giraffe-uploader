@@ -36,6 +36,9 @@ Access to the cloudwatch log group
 * If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
 you will most likely need the `Visual C++ Redistributable Packages for Visual
 Studio 2013
-<https://www.microsoft.com/en-US/download/details.aspx?id=40784>`__.
-Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
+<https://www.microsoft.com/en-US/download/details.aspx?id=40784>`. Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
 using 32-bit Python. --Quoted from the pyzbar github repo
+
+# Other
+[How to Create a Windows Service in Python](http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
+[(archived)](https://web.archive.org/web/20210127201850/http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
