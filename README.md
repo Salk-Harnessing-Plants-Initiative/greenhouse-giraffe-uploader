@@ -68,7 +68,7 @@ python get_path_to_python.py
 ```
 NSSM configures the service to be `automatic` by default, which means that if the computer is rebooted it'll start the script up again.
 
-16. Update Windows Power settings so takes longer to fall asleep (or not at all). 
+16. Update Windows power/battery settings so takes longer to fall asleep (or not at all). 
 
 ## Hints
 * On Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
