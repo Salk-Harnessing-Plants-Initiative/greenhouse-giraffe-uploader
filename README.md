@@ -10,7 +10,7 @@
 * Important: Relies on the fact that the file creation timestamp in the Windows filesystem has millisecond (and microsecond) granularity. This chronology helps distinguish adjacent images which might be stitched together in the future.
 
 # Installation 
-Use Windows Powershell to make your life easier.
+You should use Windows Powershell during this installation.
 
 ## Part 1: Dependencies
 0. Install git https://git-scm.com/download/win
@@ -39,7 +39,7 @@ Access to the cloudwatch log group
 11. Test that the Python script works: `python main.py` and put some images into your `unprocessed` directory.
 
 ## Part 3: Run automatically as a service
-We use the Non-Sucking Service Manager (https://stackoverflow.com/a/46450007/14775744).
+We use the Non-Sucking Service Manager (https://stackoverflow.com/a/46450007/14775744). Ensure you are running Windows Powershell as administrator.
 
 12. Get the python path:
 ```
