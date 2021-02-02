@@ -10,13 +10,20 @@
 * Important: Relies on the fact that the file creation timestamp in the Windows filesystem has millisecond (and microsecond) granularity. This chronology helps distinguish adjacent images which might be stitched together in the future.
 
 # Installation 
-## From a fresh Windows computer (overly detailed)
+Use Windows Powershell to make your life easier.
+
+## Part 1: Dependencies
 0. Install git https://git-scm.com/download/win
 1. Install Python 3.6.2 https://www.python.org/downloads/release/python-362/. Pip will come with it.
-2. `pip install -r requirements.txt`
-3. `cp example_config.json config.json` using Powershell, and fill it out. (You should have a Postgres user with at least read access). (VPC should have IP added to whitelist).
-4. Install AWS CLI https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-windows.html
-5. `aws configure` with `Default region name` as `us-west-2` and `Output format` `None`. (You should have an AWS IAM user with the following policies):
+2. Clone the repo
+3. `pip install -r requirements.txt` in the directory
+
+## Part 2: Configure
+4. `cp example_config.json config.json`, and begin to fill it out. 
+5. You should have a Postgres user with at least read access. 
+6. AWS VPC should have IP added to whitelist for Postgres access
+7. Create the AWS Cloudwatch log group if you want to track the service remotely.
+8. You should have an AWS IAM user with the following policies:
 ```
 s3:PutObject
 s3:ListAllMyBuckets
@@ -27,33 +34,47 @@ logs:PutLogEvents
 Access to the S3 bucket
 Access to the cloudwatch log group
 ```
-6. `python main.py`
-7. Follow the steps while running PowerShell as administrator: https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f. As of January 2021, doesn't work with Python 3.9 so that's why we have to use 3.6.2
-8. Windows Button > Services > `Giraffe Uploader Service` > `Properties` > `Startup type` > Change from `Manual` to `Automatic`
-9. Update Windows Power settings so takes longer to fall asleep (or not at all). 
+9. Put all the login information into `config.json`. The region is `us-west-2`. 
+10. Make sure to specify the `unprocessed`, `error`, and `done` folders.
+11. Test that the Python script works: `python main.py` and put some images into your `unprocessed` directory.
 
-* Hints: Windows PowerShell will make your life easier if you're coming from Linux/Mac. Also, on Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
-* If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
-you will most likely need the `Visual C++ Redistributable Packages for Visual
-Studio 2013
-<https://www.microsoft.com/en-US/download/details.aspx?id=40784>`. Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
-using 32-bit Python. --Quoted from the pyzbar github repo
+## Part 3: Run automatically as a service
+We use the Non-Sucking Service Manager (https://stackoverflow.com/a/46450007/14775744).
 
-# NSSM
-https://stackoverflow.com/a/46450007/14775744
-Get the python path:
+12. Get the python path:
 ```
 python get_path_to_python.py
 ```
-Install 
+
+13. Install 
 ```
 .\nssm install PythonGiraffeService "C:\Users\russe\AppData\Local\Programs\Python\Python36\python.exe" "C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\main.py"
 ```
 
-Set outputs to a log file:
+14. Set outputs to a log file:
 ```
 .\nssm set PythonGiraffeService AppStdout C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service.log
 ```
 ```
 .\nssm set PythonGiraffeService AppStderr C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service-error.log
 ```
+
+15. Start and stop:
+```
+.\nssm start PythonGiraffeService
+```
+```
+.\nssm stop PythonGiraffeService
+```
+NSSM configures the service to be `automatic` by default, which means that if the computer is rebooted it'll start the script up again.
+
+16. Update Windows Power settings so takes longer to fall asleep (or not at all). 
+
+## Hints
+* On Windows you have to open a new command prompt/shell after installing a CLI application for it to recognize it in path.
+* If you see an ugly ``ImportError`` when importing ``pyzbar`` on Windows
+you will most likely need the `Visual C++ Redistributable Packages for Visual
+Studio 2013
+<https://www.microsoft.com/en-US/download/details.aspx?id=40784>`. Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
+using 32-bit Python. --Quoted from the pyzbar github repo
+* If the `nssm.exe` I've provided doesn't work, you can try to get one that matches your computer at http://nssm.cc/download
