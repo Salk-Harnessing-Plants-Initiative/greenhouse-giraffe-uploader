@@ -40,9 +40,19 @@ Studio 2013
 using 32-bit Python. --Quoted from the pyzbar github repo
 
 # Other
-[How to Create a Windows Service in Python](http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
-[(archived)](https://web.archive.org/web/20210127201850/http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
-
+Get the python path:
+```
+python get_path_to_python.py
+```
+Install 
 ```
 .\nssm install PythonGiraffeService "C:\Users\russe\AppData\Local\Programs\Python\Python36\python.exe" "C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\main.py"
+```
+
+Set outputs to a log file:
+```
+.\nssm set PythonGiraffeService AppStdout C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service.log
+```
+```
+.\nssm set PythonGiraffeService AppStderr C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service-error.log
 ```
