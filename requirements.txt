@@ -5,4 +5,4 @@ boto3==1.16.55
 watchdog==1.0.2
 watchtower==1.0.5
 
-PyInstaller==3.3.1
+pywin32==300
