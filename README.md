@@ -39,7 +39,8 @@ Studio 2013
 <https://www.microsoft.com/en-US/download/details.aspx?id=40784>`. Install ``vcredist_x64.exe`` if using 64-bit Python, ``vcredist_x86.exe`` if
 using 32-bit Python. --Quoted from the pyzbar github repo
 
-# Other
+# NSSM
+https://stackoverflow.com/a/46450007/14775744
 Get the python path:
 ```
 python get_path_to_python.py
