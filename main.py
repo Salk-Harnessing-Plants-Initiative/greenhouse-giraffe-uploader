@@ -32,7 +32,8 @@ t = None
 def load_last_reference_from_file():
     # Get last valid QR Code we remember
     try:
-        with open('persist.json') as f:
+        persist_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'persist.json')
+        with open(persist_path) as f:
             last_reference = json.load(f)
         assert "qr_code" in last_reference
     except:
@@ -40,7 +41,8 @@ def load_last_reference_from_file():
     return last_reference
 
 def store_last_reference_to_file(last_reference):
-    with open('persist.json', 'w') as f:
+    persist_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'persist.json')
+    with open(persist_path, 'w') as f:
         json.dump(last_reference, f, indent = 4)
 
 def get_files_alphabetical_order(directory):
@@ -90,10 +92,13 @@ def generate_bucket_key(file_path, s3_directory):
     """Keep things nice and random to prevent collisions
     "/Users/russell/Documents/taco_tuesday.jpg" becomes "raw/taco_tuesday-b94b0793-6c74-44a9-94e0-00420711130d.jpg"
     Note: We still like to keep the basename because some files' only timestamp is in the filename
+
+    Also removes spaces, parenthesis in the filename
     """
     root_ext = os.path.splitext(ntpath.basename(file_path));
-    return s3_directory + root_ext[0] + "-" + str(uuid.uuid4()) + root_ext[1];
-
+    filename = root_ext[0] + "-" + str(uuid.uuid4()) + root_ext[1]
+    filename = filename.replace(" ", "").replace("(", "").replace(")", "")
+    return s3_directory + filename
 def creation_date(file_path):
     """
     Try to get the date that a file was created, falling back to when it was
@@ -170,7 +175,8 @@ def process(config):
     logger = logging.getLogger(__name__)
     unprocessed_dir, error_dir, done_dir = config['unprocessed_dir'], config['error_dir'], config['done_dir']
     last_reference = load_last_reference_from_file()
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client('s3', region_name=config['aws_region_name'], 
+        aws_access_key_id=config['aws_access_key_id'], aws_secret_access_key=config['aws_secret_access_key'])
 
     files = get_files_alphabetical_order(unprocessed_dir)
     if len(files) > 0:
@@ -239,18 +245,25 @@ def assert_postgres_working(config):
     ).cursor().execute("SELECT version();")
 
 def assert_s3_working(config):
-    s3 = boto3.resource('s3')
+    s3 = boto3.resource('s3', 
+        region_name=config['aws_region_name'], 
+        aws_access_key_id=config['aws_access_key_id'], 
+        aws_secret_access_key=config['aws_secret_access_key'])
     assert s3.Bucket(config['s3']['bucket']) in s3.buckets.all()
 
 def setup_remote_logging(config):
     logger = logging.getLogger(__name__)
     cloudwatch = config['cloudwatch']
     if cloudwatch['use_cloudwatch']:
+        boto3_session = boto3.Session(aws_access_key_id=config['aws_access_key_id'],
+            aws_secret_access_key=config['aws_secret_access_key'],
+            region_name=config['aws_region_name'])
         watchtower_handler = watchtower.CloudWatchLogHandler(
             log_group=cloudwatch["log_group"],
             stream_name=cloudwatch["stream_name"],
             send_interval=cloudwatch["send_interval"],
-            create_log_group=True
+            create_log_group=True,
+            boto3_session=boto3_session
         )
     logger.addHandler(watchtower_handler)
 
@@ -259,7 +272,8 @@ def main():
     global t
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    with open('config.json') as f:
+    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.json')
+    with open(config_path) as f:
         config = json.load(f)
     print("Checking the connections...")
     assert_directories_configured(config)

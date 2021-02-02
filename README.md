@@ -42,3 +42,7 @@ using 32-bit Python. --Quoted from the pyzbar github repo
 # Other
 [How to Create a Windows Service in Python](http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
 [(archived)](https://web.archive.org/web/20210127201850/http://thepythoncorner.com/dev/how-to-create-a-windows-service-in-python/)
+
+```
+.\nssm install PythonGiraffeService "C:\Users\russe\AppData\Local\Programs\Python\Python36\python.exe" "C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\main.py"
+```
