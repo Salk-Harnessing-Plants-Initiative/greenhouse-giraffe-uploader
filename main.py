@@ -1,6 +1,6 @@
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 # Path-related
 import os
 import shutil
@@ -293,13 +293,13 @@ def main():
     # run process() with countdown indefinitely
     # process() will run after the countdown if not interrupted during countdown
     try:
-        s = 0
+        last_heartbeat = datetime.now()
+        threshold = timedelta(seconds=config['heartbeat_seconds'])
         while True:
             time.sleep(1)
-            s += 1
-            if config['log_heartbeat'] and s >= config['heartbeat_seconds']:
+            if config['log_heartbeat'] and datetime.now() - last_heartbeat >= threshold:
                 logger.info("HEARTBEAT")
-                s = 0
+                last_heartbeat = datetime.now()
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt: shutting down...")
         observer.stop()
