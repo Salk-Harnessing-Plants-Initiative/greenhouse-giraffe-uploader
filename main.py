@@ -265,7 +265,7 @@ def setup_remote_logging(config):
             create_log_group=True,
             boto3_session=boto3_session
         )
-    logger.addHandler(watchtower_handler)
+        logger.addHandler(watchtower_handler)
 
 def main():
     global lock
