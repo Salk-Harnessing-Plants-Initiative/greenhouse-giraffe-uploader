@@ -51,6 +51,12 @@ python get_path_to_python.py
 .\nssm install PythonGiraffeService "C:\Users\russe\AppData\Local\Programs\Python\Python36\python.exe" "C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\main.py"
 ```
 
+Note/quirk: If there are spaces in the path to `main.py`, instead of one set of quotes, you need to use 5 double-quotes on each side:
+```
+.\nssm install PythonGiraffeService "C:\Users\weird user\AppData\Local\Programs\Python\Python36\python.exe" """""C:\Users\weird user\Desktop\code\greenhouse-giraffe-uploader\main.py"""""
+```
+
+
 14. Set outputs to a log file:
 ```
 .\nssm set PythonGiraffeService AppStdout C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service.log
