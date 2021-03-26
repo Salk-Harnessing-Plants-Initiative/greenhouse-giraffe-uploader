@@ -72,6 +72,11 @@ Note/quirk: If there are spaces in the path to `main.py`, instead of one set of 
 ```
 NSSM configures the service to be `automatic` by default, which means that if the computer is rebooted it'll start the script up again.
 
+If you mess up, ensure the service is stopped and do 
+```
+.\nssm remove PythonGiraffeService confirm
+```
+
 16. Update Windows power/battery settings so takes longer to fall asleep (or not at all). 
 
 ## Hints
