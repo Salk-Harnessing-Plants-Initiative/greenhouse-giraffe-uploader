@@ -60,9 +60,7 @@ Note/quirk: If there are spaces in the path to `main.py`, instead of one set of 
 14. Set outputs to a log file:
 ```
 .\nssm set PythonGiraffeService AppStdout C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service.log
-```
-```
-.\nssm set PythonGiraffeService AppStderr C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service-error.log
+.\nssm set PythonGiraffeService AppStderr C:\Users\russe\Desktop\code\greenhouse-giraffe-uploader\service.log
 ```
 
 15. Start and stop:
